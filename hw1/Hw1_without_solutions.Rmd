@@ -1,0 +1,194 @@
+---
+title: "Home work 1"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE)
+library(tidyverse)
+```
+
+##Homework 1 - to be done as groups
+Names:
+
+Group:
+
+For deadlines etc, see absalon. 
+
+You have to supply both the answer (whatever it is: numbers, a table, plots or combinations thereof), as well as the R or Linux code you used to make the plots. This should be done using this R markdown template: we want both the R markdown file and a resulting PDF. For PDF output, you may have to install some extra programs - R studio will tell you. 
+
+Note that:
+
+1. If the R code gives different results than your results, you will get severe point reductions or even 0 points for the exercise
+
+2. Some questions may request you to use R options we have not covered explicitly in the course: this is part of the challenge
+
+3. While this is a group work, we expect that everyone in the group will have understood the group solution: similar or harder question might show up in the individual homework. So, if something is hard, it means you need to spend more time on it
+
+4. The results should be presented on a level of detail that someone else could replicate the analysis. 
+
+For statistical tests, you have to:
+
+1) Motivate the choice of test 
+
+2) State exactly what the null hypothesis is (depends on test!)
+
+3) Comment the outcome: do you reject the null hypothesis or not, and what does this mean for the actual question we wanted to answer (interpretation)?
+
+
+###Question 1
+Install the package babynames and look at the data babynames:
+
+```{r, eval=FALSE}
+install.packages("babynames")
+```
+```{r q1.part1}
+library(babynames)
+head(babynames)
+```
+
+a) List the top 5 female baby names starting with P, regardless of year, as a table. 
+```{r}
+top_5_f_baby <- babynames |>
+  filter(sex == "F", str_detect(name, "^P")) |>
+  group_by(name) |>
+  summarise(total = sum(n), .groups = "drop") |>
+  arrange(desc(total)) |>
+  slice(1:5)
+top_5_f_baby
+```
+
+
+b) Using the results from a, plot their occurrences as a function of year using a line plot.  Comment on your results. If you get strange results, explain them and/or improve the plot. 
+```{r}
+ggplot(babynames |> filter(name %in% pull(top_5_f_baby, name), sex == "F"), mapping = aes(x = year, y = n, color = name)) +
+  geom_line()
+  
+```
+There are several empty data for several names in several years. It could be due to several names were not favourable in certain periods and the graph is not okay to observe the smaller count of name.
+
+```{r}
+ggplot(babynames |> filter(name %in% pull(top_5_f_baby, name), sex == "F"), mapping = aes(x = year, y = n)) +
+  geom_line() +
+  facet_wrap(~name, scales="free") +
+  theme_bw()
+```
+
+
+##Question 2
+In the same dataset, is the name Arwen significantly more (or less) common in 2004 vs 1990? Is the change significant? What is the likely cause? Do not use hard-coding. 
+```{r}
+count_name <- babynames |>
+  filter(year %in% c(1990, 2004)) |>
+  group_by(year) |>
+  mutate(other_name = sum(n) - n) |>
+  filter(name == "Arwen") |>
+  arrange(desc(year)) |>
+  select(year, n, other_name)
+count_name
+
+fisher.test(as.matrix(column_to_rownames(count_name, "year")))
+```
+
+
+
+##Question 3
+Produce the following plot starting from the flowers dataset. A potentially useful function that you may not have seen: bind_rows():  merges two tibbles by rows so that the joint tibble  becomes longer, not wider
+![](example.png)
+```{r}
+flowers <- read_tsv("flowers.txt")
+
+petal_data <- flowers |>
+  select(starts_with("Petal"), length = Petal.Length, width = Petal.Width, Species) |>
+  mutate(data = "Petal")
+sepal_data <- flowers |>
+  select(starts_with("Sepal"), length = Sepal.Length, width = Sepal.Width, Species)|>
+  mutate(data = "Sepal")
+
+bind_rows(sepal_data, petal_data) |>
+ggplot(mapping = aes(x = length, y = width, color = Species)) +
+  geom_point() +
+  geom_smooth(method = lm, fullrange = TRUE) +
+  facet_wrap(~data, scales = "free") + 
+  theme_bw()
+
+```
+
+
+
+##Question 4
+We are given a file with binding sites of a certain transcription factor, made with the ChIP-seq technique (you will hear a lot more about the technique later in the course) by a collaborator. 
+In the homework directory, there is a data file 'chip_mm5.txt' from the collaborator, representing binding sites from a Chip-chip experiment, with a column for  chromosome, start, end, and score, where score is how 'good' the binding is. Our collaborator has two hypotheses:
+
+1: Binding scores are dependent on chromosome
+
+2: Binding site widths (end-start) are dependent on chromosome
+
+Can you prove/disprove these two hypotheses statistically?
+```{r}
+binding_sites <- read_tsv("chip_mm5.txt")
+
+binding_sites |> 
+  select(chr, score) |> 
+  ggplot(mapping = aes(x = score)) +
+  geom_histogram() +
+  facet_wrap(~ chr) + 
+  theme_bw()
+  
+```
+or we can check with qqplot 
+```{r}
+
+scr <- binding_sites |> 
+  select(chr, score) 
+ggplot(score, mapping = aes(sample = score)) +
+  geom_qq() +
+  facet_wrap(~ chr) + 
+  theme_bw()
+```
+or shapiro test
+```{r}
+library(RVAideMemoire) #default shapiro can't handle factor by default
+byf.shapiro(score ~ chr, data = scr)
+```
+from the shapiro test we could see that all of the chromosome can't reject the H0; thus all of the are normally distributed.
+
+From the above picture, the score for each chromosome can be assumed to have normal distribution. Hence we use the ANOVA 
+```{r}
+oneway.test(score ~ chr, binding_sites |> select(chr, score))
+```
+Next we check for the length of each chromosome
+```{r}
+len <- binding_sites |> 
+  mutate(length = end - start) |>
+  select(chr, length) 
+
+
+  ggplot(len, mapping = aes(x = length)) +
+  geom_histogram() +
+  facet_wrap(~ chr) + 
+  theme_bw()
+```
+or we can check with qqplot 
+```{r}
+
+  ggplot(len, mapping = aes(sample = length)) +
+  geom_qq() +
+  facet_wrap(~ chr) + 
+  theme_bw()
+```
+or shapiro test
+```{r}
+library(RVAideMemoire) #default shapiro can't handle factor by default
+byf.shapiro(length ~ chr, data = len)
+```
+We could see that all of the shapiro test for all of the chromosomes reject the H0; thus they are not from normal distribution
+
+
+We see that the distribution is not normal. Thus we use the Kruskal test
+```{r}
+kruskal.test(pull(len, length), as.factor(pull(len, chr)))
+```
+

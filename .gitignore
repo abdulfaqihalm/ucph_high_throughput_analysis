@@ -1,0 +1,16 @@
+*.bed 
+*.tsv 
+*.csv
+*.txt
+
+*.png
+*.jpg
+*.jpeg
+*.zip
+
+*_new_cache/
+*_new_files/
+salmon_results/
+
+*.RData
+*.Rhistory
